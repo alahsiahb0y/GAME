@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Mahjong-ish Slots — Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#07120f; --panel:#0b2b22; --accent:#f6c84c; --muted:#9aa6a0;
+    --tile-bg:#fff8ee;
+  }
+  *{box-sizing:border-box} body{margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto; background:
+    radial-gradient(800px 500px at 80% 10%, #123d35 0%, #07120f 45%, #020806 100%); color:#e9f1ea;}
+  .wrap{max-width:1200px;margin:24px auto;padding:18px}
+  .header{display:flex;align-items:center;gap:14px;justify-content:space-between}
+  h1{margin:0;font-size:24px;letter-spacing:.6px}
+  .subtitle{color:var(--muted);font-size:13px}
+  .layout{display:grid;grid-template-columns:1fr 380px;gap:14px;margin-top:14px}
+  @media(max-width:980px){.layout{grid-template-columns:1fr} .side{order:2}}
+  .panel{background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(0,0,0,.12));border-radius:14px;padding:12px;border:1px solid rgba(255,255,255,.04)}
+  .slot-area{padding:10px}
+  /* reels */
+  .reels{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+  .reel{background:linear-gradient(180deg,#062623,#0b2b22);border-radius:10px;padding:8px;border:1px solid rgba(255,255,255,.05);min-height:220px;display:flex;flex-direction:column;gap:8px;justify-content:flex-start;overflow:hidden;position:relative}
+  .reel .strip{display:flex;flex-direction:column;gap:8px;transition:transform .45s cubic-bezier(.2,.9,.25,1)}
+  .tile{height:64px;border-radius:10px;background:var(--tile-bg);display:grid;place-items:center;font-weight:800;font-size:22px;color:#0b1720;box-shadow:0 6px 0 rgba(0,0,0,.25);position:relative;overflow:hidden;transition:transform .18s, box-shadow .18s}
+  .tile .sub{font-size:11px;opacity:.7;position:absolute;left:8px;top:8px}
+  .tile.match{outline:4px solid rgba(246,200,76,.22);box-shadow:0 0 24px rgba(246,200,76,.12)}
+  .tile.win-pop{animation:pop .4s ease}
+  @keyframes pop{0%{transform:scale(.9)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
+  .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+  .btn{padding:10px 14px;border-radius:12px;border:none;cursor:pointer;font-weight:700}
+  .btn.primary{background:linear-gradient(135deg,#f59e0b,#facc15);color:#111;box-shadow:0 12px 30px rgba(250,200,40,.18)}
+  .btn.ghost{background:rgba(255,255,255,.04);color:#e7ece7;border:1px solid rgba(255,255,255,.04)}
+  .top-stats{display:flex;gap:8px;align-items:center}
+  .stat{background:rgba(255,255,255,.03);padding:8px 12px;border-radius:999px;font-weight:700;color:var(--muted)}
+  .ui-row{display:flex;gap:10px;align-items:center}
+  .bet-slider{width:160px}
+  .panel.side{height:100%}
+  .paytable .row{display:flex;justify-content:space-between;gap:10px;padding:8px;border-radius:10px;margin-bottom:8px;background:rgba(0,0,0,.12)}
+  .history{max-height:200px;overflow:auto;padding:6px;display:flex;flex-direction:column;gap:8px}
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;padding:10px 14px;border-radius:10px;background:rgba(10,80,60,.95);color:#dfffe8;opacity:0;pointer-events:none;transition:opacity .25s}
+  .toast.show{opacity:1}
+  .badge{background:linear-gradient(135deg,#34d399,#10b981);padding:6px 10px;border-radius:999px;color:#07120f;font-weight:800}
+  .freebox{background:linear-gradient(135deg,#0f766e,#08332f);padding:8px;border-radius:10px;color:#dfffe8;font-weight:700}
+  .small{font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div>
+        <h1>Mahjong-ish Ways — Demo Slot</h1>
+        <div class="subtitle">Mekanik: 5 reels × 3 rows • Ways-to-win (3+ reels) • Cascading / Tumble • Wild & Scatter → Free Spins</div>
+      </div>
+      <div class="top-stats">
+        <div class="stat">Balance: <span id="balance">10,000</span></div>
+        <div class="stat">Bet: <span id="betLabel">100</span></div>
+        <div class="stat">Free Spins: <span id="freeCount">0</span></div>
+      </div>
+    </div>
+
+    <div class="layout">
+      <div class="panel slot-area">
+        <div style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between">
+          <div style="flex:1">
+            <div class="reels" id="reels"></div>
+            <div class="controls">
+              <button class="btn ghost" id="plusBet">+ Bet</button>
+              <input class="bet-slider" id="bet" type="range" min="10" max="1000" step="10" value="100" />
+              <button class="btn ghost" id="minusBet">- Bet</button>
+
+              <button class="btn primary" id="spinBtn">SPIN</button>
+              <button class="btn ghost" id="autoBtn">Auto: Off</button>
+              <button class="btn ghost" id="infoBtn">Paytable</button>
+            </div>
+            <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <div class="small">Multiplier: <b id="mult">x1</b></div>
+              <div class="small">Last Win: <b id="lastWin">0</b></div>
+              <div class="small">Tumbles: <b id="tumbleCount">0</b></div>
+            </div>
+          </div>
+          <div class="panel side" style="width:320px">
+            <h3 style="margin:4px 0 8px">Paytable & Info</h3>
+            <div class="paytable" id="paytable"></div>
+            <hr style="border-color:rgba(255,255,255,.04);margin:10px 0">
+            <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <div class="small">History</div>
+              <div class="badge" id="rtp">Demo</div>
+            </div>
+            <div class="history" id="history"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div>
+            <div class="small">Session Controls</div>
+            <div style="margin-top:6px;display:flex;gap:8px;align-items:center">
+              <button class="btn ghost" id="resetBtn">Reset</button>
+              <button class="btn ghost" id="fillBtn">Fill Demo Balance</button>
+            </div>
+          </div>
+          <div>
+            <div class="small">Sound</div>
+            <div style="margin-top:6px"><label class="small"><input type="checkbox" id="soundToggle"> Enable</label></div>
+          </div>
+        </div>
+
+        <div style="margin-top:10px">
+          <div class="small">Legend</div>
+          <ul>
+            <li class="small">Cara menang: simbol sama pada <b>reel berturut-turut dari kiri</b>, minimal 3 reel.</li>
+            <li class="small">Wild menggantikan semua simbol biasa.</li>
+            <li class="small">Scatter (🔴) memberikan free spins bila muncul ≥3.</li>
+            <li class="small">Setiap tumble yang menghasilkan kemenangan menaikkan multiplier.</li>
+          </ul>
+        </div>
+
+        <hr style="border-color:rgba(255,255,255,.04);margin:12px 0">
+
+        <div>
+          <h4 style="margin:4px 0">Developer Notes</h4>
+          <div class="small">Ini demo: tweak simbol, payout, dan probabilitas di variabel <code>SYMBOLS</code> di script.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">Win!</div>
+
+<script>
+/* =========================
+   Mahjong-ish Slots Demo
+   - 5 reels × 3 rows
+   - Ways-to-win (left-to-right)
+   - Cascading (remove winning tiles & drop)
+   - Wild (substitute), Scatter (free spins)
+   - Multiplier grows per tumble
+   ========================= */
+
+/* ===== CONFIG ===== */
+const COLS = 5, ROWS = 3;
+let balance = 10000;
+let bet = 100;
+let freeSpins = 0;
+let autoMode = false;
+let cascadeMultiplier = 1;    // current spin cascade multiplier
+let inSpin = false;
+let tumbleCount = 0;
+
+/* Symbol set (id, name, icon, color, weight, payouts for 3/4/5 consecutive reels) */
+const SYMBOLS = [
+  { id:'DRG', name:'Dragon', icon:'🀄', color:'#dc2626', weight:3, payouts:{3:12,4:40,5:160} },
+  { id:'COI', name:'Coin', icon:'🪙', color:'#d97706', weight:4, payouts:{3:10,4:36,5:140} },
+  { id:'BAN', name:'Bamboo', icon:'🎍', color:'#16a34a', weight:6, payouts:{3:8,4:28,5:100} },
+  { id:'CHA', name:'Character', icon:'字', color:'#2563eb', weight:7, payouts:{3:6,4:20,5:80} },
+  { id:'FLW', name:'Flower', icon:'🌸', color:'#a21caf', weight:8, payouts:{3:5,4:16,5:60} },
+  { id:'BRD', name:'Bird', icon:'🕊️', color:'#059669', weight:10, payouts:{3:4,4:12,5:40} },
+  { id:'WLD', name:'Wild', icon:'🀆', color:'#f97316', weight:2, payouts:{} }, // wild substitutes
+  { id:'SCT', name:'Scatter', icon:'🔴', color:'#ef4444', weight:2, payouts:{} } // scatter -> free spins
+];
+
+/* build weighted bag for RNG */
+let weighted = [];
+function rebuildWeighted(){ weighted = []; SYMBOLS.forEach((s,idx)=>{ for(let i=0;i<s.weight;i++) weighted.push(idx); }); }
+rebuildWeighted();
+
+/* UI refs */
+const reelsEl = document.getElementById('reels');
+const balanceEl = document.getElementById('balance');
+const betLabelEl = document.getElementById('betLabel');
+const lastWinEl = document.getElementById('lastWin');
+const multEl = document.getElementById('mult');
+const freeCountEl = document.getElementById('freeCount');
+const historyEl = document.getElementById('history');
+const toastEl = document.getElementById('toast');
+const tumbleCountEl = document.getElementById('tumbleCount');
+
+/* init reel DOM */
+function createReelsDOM(){
+  reelsEl.innerHTML = '';
+  for(let c=0;c<COLS;c++){
+    const reel = document.createElement('div'); reel.className = 'reel';
+    const strip = document.createElement('div'); strip.className = 'strip';
+    reel.appendChild(strip);
+    reelsEl.appendChild(reel);
+    // fill placeholder tiles
+    for(let r=0;r<ROWS;r++){
+      strip.appendChild(renderTile(randomSymIndex()));
+    }
+  }
+}
+createReelsDOM();
+
+/* helper: create tile element */
+function renderTile(symIndex){
+  const s = SYMBOLS[symIndex];
+  const el = document.createElement('div'); el.className = 'tile';
+  el.innerHTML = `<div class="sub">${s.id}</div><div style="font-size:26px">${s.icon}</div>`;
+  el.style.border = '1px solid rgba(0,0,0,.06)';
+  return el;
+}
+
+/* RNG helper */
+function randomSymIndex(){ return weighted[(Math.random()*weighted.length)|0]; }
+
+/* game state: grid[col][row] storing symbol indices */
+function generateSpinGrid(){
+  const grid = Array.from({length:COLS}, ()=>Array.from({length:ROWS}, ()=> randomSymIndex()));
+  return grid;
+}
+
+/* render grid to DOM instantly (no animation) */
+function renderGridToDOM(grid){
+  const reels = document.querySelectorAll('.reel .strip');
+  for(let c=0;c<COLS;c++){
+    const strip = reels[c];
+    strip.innerHTML = '';
+    for(let r=0;r<ROWS;r++){
+      strip.appendChild(renderTile(grid[c][r]));
+    }
+  }
+}
+
+/* Evaluate "ways" wins:
+   For each normal symbol (not wild/scatter) do left-to-right:
+   - For contiguous reels starting at reel 0, count matches per reel (symbol or wild)
+   - ways = product of counts across reels
+   - if matchedReels >= 3 -> win = basePayout * (bet/10) * ways
+   Also collect winning positions for removal (for tumble)
+*/
+function evaluateGrid(grid){
+  let totalWin = 0;
+  let winMap = Array.from({length:COLS}, ()=>Array.from({length:ROWS}, ()=>false));
+  let scatCount = 0;
+  const wildIdx = SYMBOLS.findIndex(s=>s.id==='WLD');
+
+  // count scatters
+  for(let c=0;c<COLS;c++) for(let r=0;r<ROWS;r++) if(SYMBOLS[grid[c][r]].id==='SCT') scatCount++;
+
+  // for each payout symbol
+  for(let symIndex=0;symIndex<SYMBOLS.length;symIndex++){
+    const sym = SYMBOLS[symIndex];
+    if(!sym.payouts || Object.keys(sym.payouts).length===0) continue; // skip wild/scatter or non-paying
+    let ways = 1;
+    let matchedReels = 0;
+    const tempPositions = []; // store positions per reel
+    for(let c=0;c<COLS;c++){
+      const hitsInReel = [];
+      for(let r=0;r<ROWS;r++){
+        const cell = grid[c][r];
+        if(cell===symIndex || cell===wildIdx) hitsInReel.push([c,r]);
+      }
+      if(hitsInReel.length===0) break; // stop chain
+      tempPositions.push(hitsInReel);
+      ways *= hitsInReel.length;
+      matchedReels++;
+    }
+    if(matchedReels >= 3){
+      const base = sym.payouts[matchedReels] || 0;
+      const lineWin = Math.round(base * (bet/10) * ways * cascadeMultiplier);
+      totalWin += lineWin;
+      // mark winning tiles: for the reels included, mark all matched occurrences (simplification)
+      for(let c=0;c<matchedReels;c++){
+        tempPositions[c].forEach(([cc,rr])=> winMap[cc][rr]=true);
+      }
+    }
+  }
+
+  return { totalWin, winMap, scatCount };
+}
+
+/* Remove winning tiles (winMap true), collapse columns down, fill top with new random symbols.
+   returns newGrid
+*/
+function tumbleOnce(grid, winMap){
+  const newGrid = Array.from({length:COLS}, ()=>Array.from({length:ROWS}, ()=>null));
+  for(let c=0;c<COLS;c++){
+    let writeRow = ROWS-1;
+    // move non-winning cells down
+    for(let r=ROWS-1;r>=0;r--){
+      if(!winMap[c][r]){
+        newGrid[c][writeRow] = grid[c][r];
+        writeRow--;
+      }
+    }
+    // fill remaining top with new randoms
+    for(let r=writeRow;r>=0;r--){
+      newGrid[c][r] = randomSymIndex();
+    }
+  }
+  return newGrid;
+}
+
+/* animate DOM swap from oldGrid -> newGrid with simple slide effect */
+function animateGridReplace(oldGrid, newGrid, duration=450){
+  return new Promise(resolve=>{
+    const strips = document.querySelectorAll('.reel .strip');
+    // create temporary clones for animation
+    for(let c=0;c<COLS;c++){
+      const strip = strips[c];
+      strip.style.transition = `transform ${duration}ms cubic-bezier(.2,.9,.25,1)`;
+      strip.style.transform = `translateY(-60px)`;
+      // after duration, replace content
+      setTimeout(()=>{
+        strip.style.transition = '';
+        strip.style.transform = '';
+        strip.innerHTML = '';
+        for(let r=0;r<ROWS;r++) strip.appendChild(renderTile(newGrid[c][r]));
+        if(c===COLS-1) setTimeout(resolve, 60); // small delay for last column
+      }, duration);
+    }
+  });
+}
+
+/* show toast */
+function toast(msg, ms=1200){
+  toastEl.textContent = msg; toastEl.classList.add('show');
+  setTimeout(()=>toastEl.classList.remove('show'), ms);
+}
+
+/* add to history */
+function addHistoryRow(betAmt, winAmt, details){
+  const node = document.createElement('div');
+  node.style.padding='8px'; node.style.borderRadius='10px'; node.style.background='rgba(255,255,255,.02)';
+  node.innerHTML = `<div style="display:flex;justify-content:space-between"><div class="small">${new Date().toLocaleTimeString()}</div><div class="small">Bet ${betAmt} • Win ${winAmt}</div></div>
+  <div class="small" style="margin-top:6px">${details}</div>`;
+  historyEl.prepend(node);
+}
+
+/* main spin flow (handles free spins and cascades) */
+async function spinOnce(){
+  if(inSpin) return;
+  if(balance < bet && freeSpins <= 0){ toast('Insufficient balance'); return; }
+  inSpin = true;
+  tumbleCount = 0;
+  cascadeMultiplier = 1;
+  document.getElementById('mult').textContent = 'x' + cascadeMultiplier;
+  if(freeSpins>0){ freeSpins--; updateUI(); } else { balance -= bet; updateUI(); }
+
+  let currentGrid = generateSpinGrid();
+  await animateGridReplace(null, currentGrid, 200); // initial render
+  let totalSpinWin = 0;
+  let spinDetails = [];
+
+  while(true){
+    tumbleCount++;
+    document.getElementById('tumbleCount').textContent = tumbleCount;
+    const evalRes = evaluateGrid(currentGrid);
+    if(evalRes.totalWin > 0){
+      // Win occured: add to totals, show highlights, then remove and tumble
+      totalSpinWin += evalRes.totalWin;
+      // highlight winners
+      markWinTiles(evalRes.winMap);
+      await sleep(350);
+      // remove winning tiles and tumble
+      const nextGrid = tumbleOnce(currentGrid, evalRes.winMap);
+      // animate: show pop/slide
+      await animateGridReplace(currentGrid, nextGrid, 420);
+      currentGrid = nextGrid;
+      cascadeMultiplier++;
+      document.getElementById('mult').textContent = 'x' + cascadeMultiplier;
+      spinDetails.push('Tumble win: ' + evalRes.totalWin);
+      // continue loop to check further cascades
+    } else {
+      // no win this tumble
+      // check scatter -> free spins only from initial spin position (not cascades?) 
+      // Here we count scatter on currentGrid (after cascades) to award free spins
+      const scatCount = countScatters(currentGrid);
+      if(scatCount >= 3){
+        const awarded = 8 + (scatCount-3)*3; // 3 scatters => 8 free spins, each extra +3
+        freeSpins += awarded;
+        toast('Free Spins +'+awarded, 1600);
+        spinDetails.push('Scatter x'+scatCount+' → FS '+awarded);
+      }
+      break;
+    }
+  }
+
+  // finalize
+  if(totalSpinWin > 0){
+    balance += totalSpinWin;
+    lastWinEl.textContent = totalSpinWin;
+    addHistoryRow(bet, totalSpinWin, (spinDetails.join(' • ')));
+    toast('WIN ' + totalSpinWin, 1400);
+  } else {
+    addHistoryRow(bet, 0, (spinDetails.join(' • ')||'No win'));
+  }
+  updateUI();
+  inSpin = false;
+
+  // if auto mode and have balance (or free spins), spin again
+  if(autoMode && (balance >= bet || freeSpins>0)) {
+    setTimeout(()=>{ if(!inSpin) spinOnce(); }, 500);
+  }
+}
+
+/* helper mark winners visually */
+function markWinTiles(winMap){
+  const strips = document.querySelectorAll('.reel .strip');
+  for(let c=0;c<COLS;c++){
+    for(let r=0;r<ROWS;r++){
+      if(winMap[c][r]){
+        const tile = strips[c].children[r];
+        if(tile){
+          tile.classList.add('match','win-pop');
+          setTimeout(()=>tile.classList.remove('win-pop'), 700);
+        }
+      }
+    }
+  }
+}
+
+/* count scatter on grid */
+function countScatters(grid){
+  let cnt=0;
+  for(let c=0;c<COLS;c++) for(let r=0;r<ROWS;r++) if(SYMBOLS[grid[c][r]].id==='SCT') cnt++;
+  return cnt;
+}
+
+/* small sleep */
+function sleep(ms){ return new Promise(res=>setTimeout(res, ms)); }
+
+/* UI wiring */
+document.getElementById('bet').addEventListener('input', (e)=>{
+  bet = parseInt(e.target.value,10);
+  betLabelEl.textContent = bet;
+});
+document.getElementById('plusBet').addEventListener('click', ()=>{ bet = Math.min(1000, bet+10); document.getElementById('bet').value = bet; betLabelEl.textContent = bet; });
+document.getElementById('minusBet').addEventListener('click', ()=>{ bet = Math.max(10, bet-10); document.getElementById('bet').value = bet; betLabelEl.textContent = bet; });
+
+document.getElementById('spinBtn').addEventListener('click', ()=>{ autoMode=false; document.getElementById('autoBtn').textContent='Auto: Off'; spinOnce(); });
+document.getElementById('autoBtn').addEventListener('click', ()=>{ autoMode = !autoMode; document.getElementById('autoBtn').textContent = 'Auto: ' + (autoMode?'On':'Off'); if(autoMode && !inSpin) spinOnce(); });
+
+document.getElementById('resetBtn').addEventListener('click', ()=>{ balance=10000; freeSpins=0; bet=100; document.getElementById('bet').value=100; betLabelEl.textContent=100; updateUI(); toast('Reset session'); });
+document.getElementById('fillBtn').addEventListener('click', ()=>{ balance += 50000; updateUI(); toast('Balance +50k'); });
+
+document.getElementById('infoBtn').addEventListener('click', ()=>{ showPaytable(); });
+
+/* initial UI updates */
+function updateUI(){
+  balanceEl.textContent = number(balance);
+  betLabelEl.textContent = number(bet);
+  freeCountEl.textContent = freeSpins;
+  tumbleCountEl.textContent = tumbleCount;
+}
+
+/* number format */
+function number(n){ return n.toLocaleString(); }
+
+/* build paytable UI */
+function showPaytable(){
+  const wrap = document.getElementById('paytable');
+  wrap.innerHTML = '';
+  SYMBOLS.forEach(s=>{
+    if(Object.keys(s.payouts||{}).length===0) return;
+    const row = document.createElement('div'); row.className='row';
+    row.innerHTML = `<div style="display:flex;gap:10px;align-items:center">
+      <div style="width:48px;height:48px;border-radius:8px;display:grid;place-items:center;background:${s.id==='WLD'?'#ffd7a5':'#fff8ee'}">${s.icon}</div>
+      <div><div style="font-weight:700">${s.name}</div><div class="small">${s.id}</div></div>
+    </div>
+    <div style="text-align:right"><div class="small">3: ${s.payouts[3]||'-'} &nbsp; 4: ${s.payouts[4]||'-'} &nbsp; 5: ${s.payouts[5]||'-'}</div></div>`;
+    wrap.appendChild(row);
+  });
+  // scatter/wild info
+  const extra = document.createElement('div'); extra.style.marginTop='8px'; extra.className='small';
+  extra.innerHTML = `<div><b>Wild (🀆)</b> menggantikan simbol biasa. <br/><b>Scatter (🔴)</b> 3+ memberi free spins (8+).</div>`;
+  wrap.appendChild(extra);
+}
+
+/* initial population */
+(function init(){
+  // render initial random grid
+  const grid = generateSpinGrid();
+  renderGridToDOM(grid);
+  showPaytable();
+  updateUI();
+})();
+
+/* small util to count scatters from DOM (not used) */
+function readGridFromDOM(){
+  const strips = document.querySelectorAll('.reel .strip');
+  const grid = Array.from({length:COLS}, (_,c)=>{
+    const arr = [];
+    const children = strips[c].children;
+    for(let r=0;r<ROWS;r++){
+      const sub = children[r].querySelector('.sub').textContent;
+      const idx = SYMBOLS.findIndex(s=>s.id===sub);
+      arr.push(idx>=0?idx:0);
+    }
+    return arr;
+  });
+  return grid;
+}
+
+</script>
+</body>
+</html>
